@@ -469,6 +469,59 @@ class TestUnifiedSkillBuilderPdfReferences(unittest.TestCase):
             content = f.read()
             self.assertIn("3 PDF document", content)
 
+    def test_indexes_each_pdf_markdown_reference(self):
+        """Test that unified PDF index links each lecture markdown when available."""
+        from skill_seekers.cli.unified_skill_builder import UnifiedSkillBuilder
+
+        config = {"name": "arch-course-skill", "description": "Test", "sources": []}
+
+        # Simulate per-PDF outputs produced by unified scraper.
+        os.makedirs("output/arch-course-skill_pdf_0_Lec01-intro/references", exist_ok=True)
+        with open(
+            "output/arch-course-skill_pdf_0_Lec01-intro/references/Lec01-intro.md",
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write("# Lec01")
+
+        os.makedirs("output/arch-course-skill_pdf_1_Lec02-review/references", exist_ok=True)
+        with open(
+            "output/arch-course-skill_pdf_1_Lec02-review/references/Lec02-review.md",
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write("# Lec02")
+
+        scraped_data = {
+            "documentation": [],
+            "github": [],
+            "pdf": [
+                {"pdf_path": "arch/Lec01-intro.pdf", "pdf_id": "Lec01-intro", "idx": 0, "data": {}},
+                {"pdf_path": "arch/Lec02-review.pdf", "pdf_id": "Lec02-review", "idx": 1, "data": {}},
+            ],
+        }
+
+        builder = UnifiedSkillBuilder(config, scraped_data)
+        builder._generate_pdf_references(scraped_data["pdf"])
+
+        pdf_index = os.path.join(builder.skill_dir, "references", "pdf", "index.md")
+        self.assertTrue(os.path.exists(pdf_index))
+        self.assertTrue(
+            os.path.exists(
+                os.path.join(builder.skill_dir, "references", "pdf", "Lec01-intro.md")
+            )
+        )
+        self.assertTrue(
+            os.path.exists(
+                os.path.join(builder.skill_dir, "references", "pdf", "Lec02-review.md")
+            )
+        )
+
+        with open(pdf_index, encoding="utf-8") as f:
+            content = f.read()
+            self.assertIn("[Lec01-intro](Lec01-intro.md)", content)
+            self.assertIn("[Lec02-review](Lec02-review.md)", content)
+
 
 if __name__ == "__main__":
     unittest.main()

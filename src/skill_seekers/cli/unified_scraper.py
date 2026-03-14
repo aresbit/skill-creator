@@ -1083,6 +1083,63 @@ class UnifiedScraper:
 
         logger.info(f"✅ Unified skill built: {self.output_dir}/")
 
+    def _cleanup_pdf_intermediate_outputs(self):
+        """Delete per-lecture PDF intermediate outputs after unified build.
+
+        Removes:
+        - output/{name}_pdf_{idx}_{pdf_id}/
+        - output/{name}_pdf_{idx}_{pdf_id}_extracted.json
+
+        Behavior can be disabled via config:
+        {
+          "cleanup_pdf_intermediates": false
+        }
+        """
+        if not self.config.get("cleanup_pdf_intermediates", True):
+            logger.info("🧾 Keeping PDF intermediate outputs (cleanup disabled by config)")
+            return
+
+        pdf_list = self.scraped_data.get("pdf", [])
+        if not pdf_list:
+            return
+
+        removed_dirs = 0
+        removed_files = 0
+        seen_dirs: set[str] = set()
+        seen_files: set[str] = set()
+
+        for pdf_source in pdf_list:
+            pdf_id = pdf_source.get("pdf_id")
+            idx = pdf_source.get("idx")
+            if not pdf_id:
+                pdf_path = (
+                    pdf_source.get("pdf_path")
+                    or pdf_source.get("path")
+                    or pdf_source.get("data", {}).get("source_file")
+                )
+                if pdf_path:
+                    pdf_id = Path(str(pdf_path)).stem
+
+            if idx is not None and pdf_id:
+                source_dir = Path("output") / f"{self.name}_pdf_{idx}_{pdf_id}"
+                extracted_json = Path("output") / f"{self.name}_pdf_{idx}_{pdf_id}_extracted.json"
+
+                source_dir_str = str(source_dir)
+                if source_dir_str not in seen_dirs and source_dir.is_dir():
+                    shutil.rmtree(source_dir, ignore_errors=True)
+                    seen_dirs.add(source_dir_str)
+                    removed_dirs += 1
+
+                extracted_json_str = str(extracted_json)
+                if extracted_json_str not in seen_files and extracted_json.is_file():
+                    extracted_json.unlink(missing_ok=True)
+                    seen_files.add(extracted_json_str)
+                    removed_files += 1
+
+        logger.info(
+            f"🧹 Cleaned PDF intermediates: {removed_dirs} dirs, {removed_files} extracted json files"
+        )
+
     def run(self, args=None):
         """
         Execute complete unified scraping workflow.
@@ -1159,6 +1216,9 @@ class UnifiedScraper:
                     "description": self.config.get("description", ""),
                 }
                 run_workflows(effective_args, context=unified_context)
+
+            # Phase 6: Cleanup PDF intermediate outputs
+            self._cleanup_pdf_intermediate_outputs()
 
             logger.info("\n" + "✅ " * 20)
             logger.info("Unified scraping complete!")
@@ -1264,12 +1324,19 @@ Examples:
             "Overrides per-source enhance_level in config."
         ),
     )
+    parser.add_argument(
+        "--keep-pdf-intermediates",
+        action="store_true",
+        help="Keep per-lecture PDF intermediate outputs (default: cleaned after unified build)",
+    )
 
     args = parser.parse_args()
     setup_logging()
 
     # Create scraper
     scraper = UnifiedScraper(args.config, args.merge_mode)
+    if args.keep_pdf_intermediates:
+        scraper.config["cleanup_pdf_intermediates"] = False
 
     # Disable codebase analysis if requested
     if args.skip_codebase_analysis:

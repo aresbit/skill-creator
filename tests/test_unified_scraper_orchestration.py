@@ -11,6 +11,7 @@ Covers:
 """
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -160,6 +161,52 @@ class TestScrapeAllSourcesRouting:
         # Should not raise
         scraper.scrape_all_sources()
         assert calls["github"] == 1
+
+
+class TestCleanupPdfIntermediates:
+    """_cleanup_pdf_intermediate_outputs() removes per-lecture artifacts by default."""
+
+    def test_cleanup_removes_pdf_intermediate_dirs_and_json(self, tmp_path):
+        scraper = _make_scraper(
+            extra_config={
+                "name": "arch-course-skill",
+                "description": "Test unified config",
+                "cleanup_pdf_intermediates": True,
+            },
+            tmp_path=tmp_path,
+        )
+        scraper.name = "arch-course-skill"
+        scraper.scraped_data["pdf"] = [
+            {"idx": 0, "pdf_id": "Lec01-intro", "pdf_path": "arch/Lec01-intro.pdf", "data": {}},
+            {"idx": 1, "pdf_id": "Lec02-review", "pdf_path": "arch/Lec02-review.pdf", "data": {}},
+        ]
+
+        old_cwd = Path.cwd()
+        try:
+            # Cleanup method uses relative "output/" path.
+            # Run inside tmp_path to isolate filesystem side effects.
+            os.chdir(tmp_path)
+            Path("output/arch-course-skill_pdf_0_Lec01-intro/references").mkdir(
+                parents=True, exist_ok=True
+            )
+            Path("output/arch-course-skill_pdf_1_Lec02-review/references").mkdir(
+                parents=True, exist_ok=True
+            )
+            Path("output/arch-course-skill_pdf_0_Lec01-intro_extracted.json").write_text(
+                "{}", encoding="utf-8"
+            )
+            Path("output/arch-course-skill_pdf_1_Lec02-review_extracted.json").write_text(
+                "{}", encoding="utf-8"
+            )
+
+            scraper._cleanup_pdf_intermediate_outputs()
+
+            assert not Path("output/arch-course-skill_pdf_0_Lec01-intro").exists()
+            assert not Path("output/arch-course-skill_pdf_1_Lec02-review").exists()
+            assert not Path("output/arch-course-skill_pdf_0_Lec01-intro_extracted.json").exists()
+            assert not Path("output/arch-course-skill_pdf_1_Lec02-review_extracted.json").exists()
+        finally:
+            os.chdir(old_cwd)
 
 
 # ===========================================================================

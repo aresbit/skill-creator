@@ -82,6 +82,26 @@ skill-seekers package output/django --target claude
 
 **That's it!** You now have `output/django-claude.zip` ready to use.
 
+### Fork Contributors: Local Build First
+
+If you are developing from a fork, always prefer your local build over the published PyPI package.
+
+```bash
+# From your fork root
+python3 -m pip install --user --no-build-isolation --force-reinstall --no-deps .
+```
+
+This ensures `skill-seekers` CLI uses your latest local code changes.
+
+Verify:
+
+```bash
+skill-seekers --version
+python3 -m pip show skill-seekers
+```
+
+For contributors, this command should be your default reinstall step after code changes.
+
 ### Other Sources
 
 ```bash
@@ -132,6 +152,7 @@ Skill Seekers is the **data layer for AI systems**. It transforms documentation 
 | **Look up commands** | [CLI Reference](docs/reference/CLI_REFERENCE.md) - All 20 commands |
 | **Configure** | [Config Format](docs/reference/CONFIG_FORMAT.md) - JSON specification |
 | **Fix issues** | [Troubleshooting](docs/user-guide/06-troubleshooting.md) - Common problems |
+| **See all commands quickly** | [命令指南](docs/reference/命令指南.md) - Full command map + practical examples |
 
 **Complete documentation:** [docs/README.md](docs/README.md)
 

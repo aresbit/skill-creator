@@ -969,11 +969,83 @@ This skill combines knowledge from multiple sources:
         pdf_dir = os.path.join(self.skill_dir, "references", "pdf")
         os.makedirs(pdf_dir, exist_ok=True)
 
+        # Remove stale markdown files from previous runs to keep stable filenames.
+        for existing_md in Path(pdf_dir).glob("*.md"):
+            existing_md.unlink(missing_ok=True)
+
+        # Copy per-PDF markdown references into unified references/pdf/
+        # and build an index that points to each lecture/document.
+        index_entries: list[dict[str, str | int | None]] = []
+
+        for source_idx, pdf_source in enumerate(pdf_list):
+            pdf_path = (
+                pdf_source.get("pdf_path")
+                or pdf_source.get("path")
+                or pdf_source.get("data", {}).get("source_file")
+                or "unknown.pdf"
+            )
+            pdf_id = pdf_source.get("pdf_id") or Path(str(pdf_path)).stem or f"pdf_{source_idx}"
+            idx = pdf_source.get("idx")
+            total_pages = (
+                pdf_source.get("data", {}).get("total_pages")
+                if isinstance(pdf_source.get("data"), dict)
+                else None
+            )
+
+            candidate_ref_dirs: list[Path] = []
+            if idx is not None:
+                candidate_ref_dirs.append(
+                    Path("output") / f"{self.name}_pdf_{idx}_{pdf_id}" / "references"
+                )
+            else:
+                candidate_ref_dirs.extend(
+                    Path("output").glob(f"{self.name}_pdf_*_{pdf_id}/references")
+                )
+
+            linked_files: list[str] = []
+            for ref_dir in candidate_ref_dirs:
+                if not ref_dir.is_dir():
+                    continue
+
+                md_files = [p for p in sorted(ref_dir.glob("*.md")) if p.name.lower() != "index.md"]
+                if not md_files:
+                    continue
+
+                # Keep one canonical markdown filename per PDF source.
+                target_name = f"{pdf_id}.md"
+                target_path = Path(pdf_dir) / target_name
+                shutil.copy2(md_files[0], target_path)
+                linked_files.append(target_name)
+
+            # Keep one primary markdown link per PDF in the index.
+            primary_link = linked_files[0] if linked_files else None
+            index_entries.append(
+                {
+                    "pdf_id": pdf_id,
+                    "pdf_path": str(pdf_path),
+                    "primary_link": primary_link,
+                    "total_pages": total_pages,
+                }
+            )
+
         # Create index
         index_path = os.path.join(pdf_dir, "index.md")
         with open(index_path, "w", encoding="utf-8") as f:
             f.write("# PDF Documentation\n\n")
             f.write(f"Reference from {len(pdf_list)} PDF document(s).\n\n")
+            f.write("## Lectures / Documents\n\n")
+            for entry in index_entries:
+                title = entry["pdf_id"]
+                source_path = entry["pdf_path"]
+                page_info = (
+                    f", {entry['total_pages']} pages"
+                    if isinstance(entry["total_pages"], int)
+                    else ""
+                )
+                if entry["primary_link"]:
+                    f.write(f"- [{title}]({entry['primary_link']}) - `{source_path}`{page_info}\n")
+                else:
+                    f.write(f"- {title} - `{source_path}`{page_info}\n")
 
         logger.info(f"Created PDF references ({len(pdf_list)} sources)")
 
