@@ -94,6 +94,13 @@ UNIFIED_ARGUMENTS: dict[str, dict[str, Any]] = {
             "metavar": "LEVEL",
         },
     },
+    "keep_inter": {
+        "flags": ("--keep-inter",),
+        "kwargs": {
+            "action": "store_true",
+            "help": "Keep per-lecture PDF intermediate outputs (default: cleaned after unified build)",
+        },
+    },
 }
 
 

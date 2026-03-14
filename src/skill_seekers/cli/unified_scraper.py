@@ -1325,17 +1325,17 @@ Examples:
         ),
     )
     parser.add_argument(
-        "--keep-pdf-intermediates",
+        "--keep-inter",
         action="store_true",
+        dest="keep_inter",
         help="Keep per-lecture PDF intermediate outputs (default: cleaned after unified build)",
     )
-
     args = parser.parse_args()
     setup_logging()
 
     # Create scraper
     scraper = UnifiedScraper(args.config, args.merge_mode)
-    if args.keep_pdf_intermediates:
+    if args.keep_inter:
         scraper.config["cleanup_pdf_intermediates"] = False
 
     # Disable codebase analysis if requested
